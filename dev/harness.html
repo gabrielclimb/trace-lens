@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Lens — view harness</title>
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/map.css">
+<link rel="stylesheet" href="../css/timeline.css">
+<link rel="stylesheet" href="../css/journey.css">
+<link rel="stylesheet" href="../css/services.css">
+<link rel="stylesheet" href="../css/tree.css">
+<link rel="stylesheet" href="../css/insights.css">
+<link rel="stylesheet" href="../css/detail.css">
+<style>
+  body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  #hz-bar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--surface-1); font-size: 12px; flex: none; }
+  #hz-body { flex: 1; display: flex; min-height: 0; }
+  #hz-main { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+  #hz-side { width: 380px; flex: none; border-left: 1px solid var(--border); background: var(--surface-1); overflow: auto; min-height: 0; }
+  #hz-log { color: var(--text-3); margin-left: auto; font-family: var(--font-mono); max-width: 40%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div id="hz-bar">
+  <strong>harness</strong>
+  <select id="hz-view" class="tv-select"></select>
+  <select id="hz-group" class="tv-select">
+    <option value="service">Service</option><option value="namespace">Namespace</option><option value="scope">Deploy scope</option>
+  </select>
+  <button id="hz-theme" class="tv-btn">theme: auto</button>
+  <input id="hz-span" class="tv-input" placeholder="selectedSpanId" size="18">
+  <input id="hz-search" class="tv-input" placeholder="search" size="14">
+  <span id="hz-log"></span>
+</div>
+<div id="hz-body"><div id="hz-main"></div><aside id="hz-side"></aside></div>
+
+<script src="../js/core/util.js"></script>
+<script src="../js/core/parse.js"></script>
+<script src="../js/core/model.js"></script>
+<script src="../js/core/store.js"></script>
+<script src="../js/views/map.js"></script>
+<script src="../js/views/timeline.js"></script>
+<script src="../js/views/journey.js"></script>
+<script src="../js/views/services.js"></script>
+<script src="../js/views/tree.js"></script>
+<script src="../js/views/insights.js"></script>
+<script src="../js/views/detail.js"></script>
+<script>
+// Optional alternative data: ?data=../tests/fixtures/synthetic-5k.js (a file setting window.TV_SAMPLE_TRACE)
+(function () {
+  var q = new URLSearchParams(location.search);
+  var src = q.get('data') || '../data/sample-trace.js';
+  document.write('<script src="' + src.replace(/"/g, '') + '"><\/script>');
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var TV = window.TV, store = TV.store;
+  var q = new URLSearchParams(location.search);
+  var viewId = q.get('view') || 'map';
+  var log = document.getElementById('hz-log');
+  function say(msg) { log.textContent = msg; console.log('[harness] ' + msg); }
+
+  var api = TV.createApi(store, {
+    showView: function (id) { say('showView(' + id + ')'); store.set({ view: id }); },
+    onSelectSpan: function (id) { say('selectSpan(' + id + ')'); },
+  });
+  window.TV_API = api;
+
+  var sel = document.getElementById('hz-view');
+  TV.views.list().forEach(function (v) {
+    var o = document.createElement('option'); o.value = v.id; o.textContent = v.id; if (v.id === viewId) o.selected = true; sel.appendChild(o);
+  });
+  sel.onchange = function () { q.set('view', sel.value); location.search = q.toString(); };
+
+  var groupSel = document.getElementById('hz-group');
+  groupSel.value = q.get('groupBy') || 'service';
+  groupSel.onchange = function () { store.set({ groupBy: groupSel.value }); };
+
+  var themes = ['auto', 'light', 'dark'], ti = 0;
+  var initialTheme = q.get('theme');
+  function applyTheme(t) {
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('hz-theme').textContent = 'theme: ' + t;
+    store.set({ theme: t });
+  }
+  document.getElementById('hz-theme').onclick = function () { ti = (ti + 1) % 3; applyTheme(themes[ti]); };
+  if (initialTheme) { ti = Math.max(0, themes.indexOf(initialTheme)); applyTheme(themes[ti]); }
+
+  var spanIn = document.getElementById('hz-span');
+  spanIn.onchange = function () { api.selectSpan(spanIn.value.trim() || null); };
+  var searchIn = document.getElementById('hz-search');
+  searchIn.oninput = function () { store.set({ search: searchIn.value }); };
+
+  var instances = [];
+  function mount(id, container) {
+    var def = TV.views.get(id);
+    if (!def) { container.textContent = 'view "' + id + '" not registered (file missing or failed to load)'; return; }
+    var inst = def.mount(container, api) || {};
+    instances.push(inst);
+    return inst;
+  }
+
+  if (!window.TV_SAMPLE_TRACE) { say('no TV_SAMPLE_TRACE loaded'); return; }
+  var t0 = performance.now();
+  store.load(window.TV_SAMPLE_TRACE, window.TV_SAMPLE_NAME || 'sample');
+  if (q.get('groupBy')) store.set({ groupBy: q.get('groupBy') });
+  store.set({ view: viewId });
+  var t1 = performance.now();
+
+  var main = mount(viewId, document.getElementById('hz-main'));
+  var side = viewId === 'detail' ? null : mount('detail', document.getElementById('hz-side'));
+  if (viewId === 'detail') document.getElementById('hz-side').style.display = 'none';
+
+  var all = new Set(['*']);
+  instances.forEach(function (i) { if (i && i.update) i.update(store.get(), all); });
+  var t2 = performance.now();
+  say('model ' + (t1 - t0).toFixed(0) + 'ms, first render ' + (t2 - t1).toFixed(0) + 'ms, spans ' + store.get().model.spans.length);
+  window.TV_HARNESS_TIMINGS = { model: t1 - t0, firstRender: t2 - t1 };
+
+  store.subscribe(function (state, changed) {
+    instances.forEach(function (i) { if (i && i.update) i.update(state, changed); });
+  });
+  if (q.get('span')) api.selectSpan(q.get('span'));
+})();
+</script>
+</body>
+</html>

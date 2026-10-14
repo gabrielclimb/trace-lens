@@ -1,0 +1,7 @@
+# Allowlist: only the static app and the fictional demo trace go into the image.
+*
+!index.html
+!css/
+!js/
+!data/sample-trace.js
+!docker/

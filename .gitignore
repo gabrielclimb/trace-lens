@@ -1,0 +1,13 @@
+# Your own traces: real telemetry stays on your machine
+data/local-trace.js
+data/local-trace.json
+*.local.json
+traces/
+
+.DS_Store
+node_modules/
+__pycache__/
+
+# Generated test data (make fixtures)
+tests/fixtures/
+tests/oracle-out/

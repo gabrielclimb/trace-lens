@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Lens</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230b0b0b'/%3E%3Cpath d='M6 8h7M8 12h9M10 16h5' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('tv.theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/map.css">
+<link rel="stylesheet" href="css/timeline.css">
+<link rel="stylesheet" href="css/journey.css">
+<link rel="stylesheet" href="css/services.css">
+<link rel="stylesheet" href="css/tree.css">
+<link rel="stylesheet" href="css/insights.css">
+<link rel="stylesheet" href="css/detail.css">
+</head>
+<body class="app-page">
+<div class="app is-empty" id="app">
+  <header class="app-header">
+    <div class="app-brand">
+      <span class="app-logo" aria-hidden="true"></span>
+      <span>Trace Lens</span>
+    </div>
+    <div class="app-meta" id="app-meta" aria-live="polite"></div>
+    <select class="tv-select app-trace-select" id="app-trace" aria-label="Trace in this file" hidden></select>
+    <div class="app-actions">
+      <div class="app-groupby">
+        <span class="app-label">Group by</span>
+        <div class="tv-seg" id="app-groupby" role="group" aria-label="Group spans by"></div>
+      </div>
+      <button type="button" class="tv-btn" id="app-open" title="Open a trace JSON file">Open file</button>
+      <button type="button" class="tv-btn" id="app-paste" title="Paste trace JSON (or press Cmd/Ctrl+V anywhere)">Paste JSON</button>
+      <button type="button" class="tv-btn tv-btn--icon" id="app-theme"></button>
+      <input type="file" id="app-file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <div class="app-banner" id="app-banner" role="alert" hidden></div>
+
+  <div class="app-toolbar" id="app-toolbar">
+    <div class="app-search">
+      <input type="search" class="tv-input" id="app-search" placeholder="Search spans, services, attributes" autocomplete="off" spellcheck="false" aria-label="Search spans">
+      <kbd class="app-kbd app-search-kbd" aria-hidden="true">/</kbd>
+    </div>
+    <span class="app-sep" aria-hidden="true"></span>
+    <div class="app-cats" id="app-cats" role="group" aria-label="Span categories (legend and filter)"></div>
+    <span class="app-sep" aria-hidden="true"></span>
+    <label class="tv-check"><input type="checkbox" id="app-errors"> Errors only</label>
+    <label class="app-mindur">
+      <span class="app-label">Min duration</span>
+      <select class="tv-select" id="app-mindur" aria-label="Minimum span duration"></select>
+    </label>
+    <div class="app-focus" id="app-focus" hidden></div>
+    <button type="button" class="tv-btn tv-btn--ghost tv-btn--sm" id="app-clear" hidden>Clear filters</button>
+    <span class="app-match tv-num" id="app-match" hidden></span>
+  </div>
+
+  <nav class="app-tabs" id="app-tabs" aria-label="Views">
+    <div class="app-tablist" id="app-tablist" role="tablist"></div>
+    <button type="button" class="tv-btn tv-btn--ghost tv-btn--sm app-side-toggle" id="app-side-toggle"></button>
+  </nav>
+
+  <div class="app-body" id="app-body">
+    <main class="app-main" id="app-main"></main>
+    <div class="app-resizer" id="app-resizer" role="separator" aria-orientation="vertical" aria-label="Resize details panel" tabindex="0"></div>
+    <aside class="app-side" id="app-side" aria-label="Details"></aside>
+    <section class="app-empty" id="app-empty" hidden></section>
+  </div>
+</div>
+
+<div class="app-drop" id="app-drop" hidden>
+  <div class="app-drop-card">
+    <div class="app-drop-title">Drop to open trace</div>
+    <div class="tv-muted">Tempo / OTLP or Jaeger JSON</div>
+  </div>
+</div>
+
+<dialog class="app-dialog" id="app-paste-dialog" aria-labelledby="app-paste-title">
+  <form method="dialog" class="app-dialog-form" id="app-paste-form">
+    <h2 class="app-dialog-title" id="app-paste-title">Paste trace JSON</h2>
+    <p class="app-dialog-hint tv-secondary">Tempo / OTLP (<span class="tv-mono">batches</span> or <span class="tv-mono">resourceSpans</span>) or Jaeger JSON. Nothing leaves this page.</p>
+    <textarea class="app-dialog-text tv-mono" id="app-paste-text" spellcheck="false" placeholder='{"batches": [ ... ]}'></textarea>
+    <div class="app-dialog-error" id="app-paste-error" role="alert" hidden></div>
+    <div class="app-dialog-actions">
+      <button type="button" class="tv-btn tv-btn--ghost" id="app-paste-cancel">Cancel</button>
+      <button type="submit" class="tv-btn app-btn-primary" id="app-paste-load">Load trace</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/parse.js"></script>
+<script src="js/core/model.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/views/map.js"></script>
+<script src="js/views/timeline.js"></script>
+<script src="js/views/journey.js"></script>
+<script src="js/views/services.js"></script>
+<script src="js/views/tree.js"></script>
+<script src="js/views/insights.js"></script>
+<script src="js/views/detail.js"></script>
+<script src="data/sample-trace.js"></script>
+<script src="data/local-trace.js" onerror="this.remove()"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
